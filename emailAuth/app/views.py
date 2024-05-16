@@ -2,12 +2,16 @@ from django.shortcuts import render
 
 # Create your views here.
 # views.py
+
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 from django.core.mail import send_mail
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User
 from rest_framework.decorators import api_view
 # Assuming you're using the built-in User model
+from rest_framework.decorators import api_view 
 import random
 import string
 from app.models import OTP  # Assuming you have a model named OTP in your app
@@ -15,16 +19,21 @@ from app.models import OTP  # Assuming you have a model named OTP in your app
 from django.core.exceptions import ValidationError
 
 @api_view(['POST'])
+@csrf_exempt
 def send_otp(request):
     try:
         email = request.data.get('email')
-        user = get_object_or_404(User, email=email)
-        
+
+        # Simple check to verify if the email is in a valid format
+        if not '@' in email or '.' not in email:
+            raise ValidationError("Invalid email format")
+
+        # Perform basic validation on the email address
+        if not email.endswith('@gmail.com'):
+            raise ValidationError("Invalid email domain")
+
         # Generate OTP (a 6-digit code)
         otp = ''.join(random.choices(string.digits, k=6))
-
-        # Save OTP in the database (assuming you have an OTP model)
-        otp_instance = OTP.objects.create(user=user, otp=otp)
 
         # Send OTP to the user's email
         send_mail(
@@ -36,14 +45,11 @@ def send_otp(request):
         )
 
         return JsonResponse({'message': 'OTP sent successfully'})
-    except User.DoesNotExist:
-        return JsonResponse({'error': 'User not found'}, status=404)
     except ValidationError as e:
         return JsonResponse({'error': str(e)}, status=400)
     except Exception as e:
         error_message = f'An error occurred while sending OTP: {str(e)}'
         return JsonResponse({'error': error_message}, status=500)
-
 
 @api_view(['POST'])
 def verify_otp(request):
